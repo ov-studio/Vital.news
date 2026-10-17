@@ -2,9 +2,9 @@
 
 Official news feed for Vital.sandbox — project updates, announcements, and release notes from the team.
 
-Vital.news is a plain directory of **`.mdx` posts** with their cover images next to them. Posts are read straight from this repository, so adding, editing or removing one **never needs a site rebuild**.
+Vital.news is a plain directory of **`.mdx` posts** with their cover images next to them. Posts are read straight from this repository, so adding, editing or removing one never needs a site rebuild.
 
-## Publishing a Post
+## Publishing Post
 
 **Publish only through `main`** — do not open manual pull requests for new posts.
 
