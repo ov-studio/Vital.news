@@ -31,3 +31,27 @@ This is a test post. Copy this file to create a new one. It stays hidden until y
 ## Writing
 
 Posts are plain Markdown (tables and strikethrough work too). Raw HTML such as `<br/>` is fine. MDX imports and JSX components are not supported and are ignored. Images placed next to the post can be referenced by relative path, for example `![Screenshot](./screenshot.png)`.
+
+## Formatting
+
+Regular Markdown works: **bold**, *italic*, [links](/docs), lists and blockquotes.
+
+> Blockquotes look like this.
+
+Code blocks are highlighted:
+
+```lua
+local function greet(name)
+  print("Hello, " .. name)
+end
+
+greet("Vital")
+```
+
+## Images
+
+Put images in `frontend/public/news/` and reference them by absolute path:
+
+```md
+![Alt text](/news/my-image.png)
+```
