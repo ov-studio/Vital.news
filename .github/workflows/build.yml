@@ -1,0 +1,238 @@
+name: Build News
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.mdx'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+      - '**/*.gif'
+      - '**/*.webp'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ── 2. Build news.json ─────────────────────────────────────────────────
+      - name: Build news.json
+        run: |
+          python3 - << 'PYEOF'
+          import json, posixpath, re, subprocess, sys
+          from datetime import date, datetime, timezone
+          from pathlib import Path
+          from urllib.parse import quote
+
+          try:
+            import yaml, nh3
+            from markdown_it import MarkdownIt
+            from mdit_py_plugins.anchors import anchors_plugin
+          except ImportError:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "pyyaml", "markdown-it-py", "mdit-py-plugins", "nh3", "-q"])
+            import yaml, nh3
+            from markdown_it import MarkdownIt
+            from mdit_py_plugins.anchors import anchors_plugin
+
+          RAW_BASE  = "https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/main"
+          SKIP_DIRS = {".git", ".github", "node_modules"}
+          SLUG_RE   = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]*$')
+          FRONT_RE  = re.compile(r'^﻿?---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|$)(.*)$', re.S)
+
+          # Markdown -> HTML (CommonMark + tables + strikethrough, raw HTML allowed, then sanitized)
+          md = MarkdownIt("commonmark", {"html": True}).enable(["table", "strikethrough"]).use(anchors_plugin, min_level=1, max_level=6)
+
+          # Default allow-list, plus heading ids so anchors keep working
+          attrs = {k: set(v) for k, v in nh3.ALLOWED_ATTRIBUTES.items()}
+          for h in ("h1", "h2", "h3", "h4", "h5", "h6"):
+            attrs.setdefault(h, set()).add("id")
+
+          def raw_url(path):
+            return f"{RAW_BASE}/{quote(path)}"
+
+          def is_url(v):
+            return bool(re.match(r'^(https?:)?//', v, re.I))
+
+          def resolve_path(value, mdx):
+            """Path written in a post -> repo-relative path of an existing file (or None)."""
+            v = str(value).strip()
+            cands = []
+            if v.startswith("/"):
+              v = v.lstrip("/")
+              cands.append(v)
+              if v.startswith("news/"): cands.append(v[len("news/"):])  # site-style path from the old setup
+            else:
+              cands.append((mdx.parent / v).as_posix())
+              cands.append(v)
+            for c in cands:
+              p = posixpath.normpath(c)
+              if p.startswith(".."): continue
+              if Path(p).is_file(): return p
+            return None
+
+          def to_iso(v):
+            if isinstance(v, datetime):
+              if v.tzinfo is None: v = v.replace(tzinfo=timezone.utc)
+              return v.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+            if isinstance(v, date):
+              return f"{v.isoformat()}T00:00:00.000Z"
+            if v in (None, ""): return None
+            try:    return to_iso(datetime.fromisoformat(str(v).replace("Z", "+00:00")))
+            except: return None
+
+          def render(body, mdx):
+            html = nh3.clean(md.render(body), tags=nh3.ALLOWED_TAGS, attributes=attrs, url_schemes={"http", "https", "mailto"})
+
+            def fix_img(m):
+              src = m.group(1)
+              if not is_url(src) and not src.startswith("data:"):
+                found = resolve_path(src, mdx)
+                if found: src = raw_url(found)
+              return f'<img src="{src}" loading="lazy"'
+
+            html = re.sub(r'<img src="([^"]*)"', fix_img, html)
+            html = re.sub(r'<a href="(https?://)', r'<a target="_blank" href="\1', html)  # external links open in a new tab
+            return html
+
+          posts, errors, seen = [], [], {}
+
+          for mdx in sorted(Path(".").rglob("*.mdx")):
+            if any(part in SKIP_DIRS for part in mdx.parts): continue
+
+            slug = mdx.stem
+            m = FRONT_RE.match(mdx.read_text(encoding="utf-8"))
+            try:    front = (yaml.safe_load(m.group(1)) or {}) if m else {}
+            except: front = None
+            body = m.group(2) if m else ""
+
+            if front is None:
+              errors.append(f"{mdx}: frontmatter is not valid YAML")
+              continue
+
+            if front.get("publish") is not True:
+              print(f"  skip {slug} — draft")
+              continue
+
+            if not SLUG_RE.match(slug):
+              errors.append(f"{mdx}: file name '{slug}' is not a valid URL slug (letters, numbers, '-' and '_' only)")
+              continue
+            if slug in seen:
+              errors.append(f"{mdx}: duplicate slug '{slug}', also used by {seen[slug]} (the file name is the URL)")
+              continue
+            seen[slug] = str(mdx)
+
+            title = str(front.get("title") or "").strip()
+            date_ = to_iso(front.get("date"))
+            if not title or not date_:
+              errors.append(f"{mdx}: frontmatter 'title' and a valid 'date' (e.g. 2026-10-17) are required")
+              continue
+
+            if re.search(r'^\s*(import|export)\s', body, re.M) or re.search(r'<[A-Z][A-Za-z0-9]*[\s/>]', body):
+              print(f"::warning file={mdx}::MDX imports / JSX components are not supported, use plain Markdown")
+
+            print(f"  ok   {slug}")
+
+            # cover: explicit URL, else a file next to the post (or from the repo root)
+            cover = str(front.get("cover") or "").strip() or None
+            if cover and not is_url(cover):
+              found = resolve_path(cover, mdx)
+              if found: cover = raw_url(found)
+              else:
+                print(f"::warning file={mdx}::cover '{cover}' not found, post will have no cover")
+                cover = None
+
+            tags = front.get("tags")
+            posts.append({
+              "slug":        slug,
+              "title":       title,
+              "description": str(front.get("description") or "").strip(),
+              "date":        date_,
+              "author":      str(front.get("author") or "").strip() or "${{ github.repository_owner }}",
+              "tags":        [str(t) for t in tags] if isinstance(tags, list) else [],
+              "cover":       cover,
+              "path":        mdx.as_posix(),
+              "html":        render(body, mdx),
+            })
+
+          if errors:
+            for e in errors: print(f"::error::{e}", file=sys.stderr)
+            sys.exit(1)
+
+          posts.sort(key=lambda p: p["slug"])
+          posts.sort(key=lambda p: p["date"], reverse=True)  # newest first
+
+          Path("news.json").write_text(json.dumps({
+            "generated_at": "${{ github.event.head_commit.timestamp || github.run_started_at }}",
+            "commit":       "${{ github.sha }}",
+            "count":        len(posts),
+            "posts":        posts,
+          }, indent=2))
+          print(f"\nBuilt news.json — {len(posts)} post(s)")
+          PYEOF
+
+      # ── 3. Show what was built ─────────────────────────────────────────────
+      - name: Show news.json
+        run: cat news.json
+
+      # ── 4. Commit news.json to main ────────────────────────────────────────
+      # This is what the Next.js site actually fetches from at runtime.
+      - name: Commit news.json to main
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add news.json
+          if git diff --cached --quiet; then
+            echo "news.json unchanged, nothing to commit"
+            echo "NEW_SHA=" >> $GITHUB_ENV
+          else
+            git commit -m "chore: update news.json [skip ci]"
+            git push origin HEAD:main
+            echo "NEW_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+          fi
+
+      # ── 5. Purge jsDelivr cache ──────────────────────────────────────────
+      # Strategy: purge @main and the exact commit SHA three times each,
+      # spaced 15 s apart, to beat both edge-propagation lag (GitHub's own
+      # CDN takes a few seconds to expose a new commit to jsDelivr's origin
+      # fetcher) and jsDelivr's own multi-POP propagation window.
+      - name: Purge jsDelivr cache (round 1 — immediate)
+        run: |
+          REPO="${{ github.repository }}"
+          SHA="${{ env.NEW_SHA || github.sha }}"
+          echo "Purging @main and @${SHA:0:7}…"
+          curl -fsS "https://purge.jsdelivr.net/gh/${REPO}@main/news.json"
+          curl -fsS "https://purge.jsdelivr.net/gh/${REPO}@${SHA}/news.json" || true
+          echo "Round 1 done"
+
+      - name: Wait 15 s
+        run: sleep 15
+
+      - name: Purge jsDelivr cache (round 2)
+        run: |
+          REPO="${{ github.repository }}"
+          SHA="${{ env.NEW_SHA || github.sha }}"
+          curl -fsS "https://purge.jsdelivr.net/gh/${REPO}@main/news.json"
+          curl -fsS "https://purge.jsdelivr.net/gh/${REPO}@${SHA}/news.json" || true
+          echo "Round 2 done"
+
+      - name: Wait 15 s
+        run: sleep 15
+
+      - name: Purge jsDelivr cache (round 3)
+        run: |
+          REPO="${{ github.repository }}"
+          SHA="${{ env.NEW_SHA || github.sha }}"
+          curl -fsS "https://purge.jsdelivr.net/gh/${REPO}@main/news.json"
+          curl -fsS "https://purge.jsdelivr.net/gh/${REPO}@${SHA}/news.json" || true
+          echo "Round 3 done — cache should be fresh on all POPs"

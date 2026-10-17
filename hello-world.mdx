@@ -1,0 +1,32 @@
+---
+title: Hello World
+description: A test post that doubles as a guide for writing new posts
+date: 2026-10-16
+author: ov-studio
+tags: [meta, guide]
+---
+
+This is a test post. Copy this file to create a new one. It stays hidden until you add `publish: true` to the frontmatter.
+
+## Creating a post
+
+1. Create a new `.mdx` file anywhere in this repository, for example `17_10_2026/my-first-post.mdx`.
+2. The file name becomes the URL, so `my-first-post.mdx` is served at `/news/my-first-post`. File names must be unique across the whole repository.
+3. Fill in the frontmatter below, set `publish: true`, and push to `main`.
+4. The **Build News** workflow rebuilds `news.json` and the site picks the post up within a few minutes, no frontend rebuild needed.
+
+## Frontmatter
+
+| Field | Required | Notes |
+|---|---|---|
+| `title` | Yes | Shown on the card and in the post. |
+| `date` | Yes | `YYYY-MM-DD`. Newest posts are listed first. |
+| `description` | No | One-line summary for the card and link previews. |
+| `author` | No | Defaults to the repository owner. |
+| `tags` | No | Example: `[announcement, update]`. |
+| `cover` | No | Image next to the post (`cover.png`) or a path from the repository root. PNG, JPG and GIF also work as the link-preview image. |
+| `publish` | Yes, to go live | Anything other than `true` keeps the post hidden. |
+
+## Writing
+
+Posts are plain Markdown (tables and strikethrough work too). Raw HTML such as `<br/>` is fine. MDX imports and JSX components are not supported and are ignored. Images placed next to the post can be referenced by relative path, for example `![Screenshot](./screenshot.png)`.
