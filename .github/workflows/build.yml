@@ -4,12 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - '**/*.mdx'
-      - '**/*.png'
-      - '**/*.jpg'
-      - '**/*.jpeg'
-      - '**/*.gif'
-      - '**/*.webp'
+      - 'content/**'
       - '.github/workflows/build.yml'
   workflow_dispatch:
 
@@ -52,7 +47,7 @@ jobs:
           from mdit_py_plugins.anchors import anchors_plugin
 
           RAW_BASE  = "https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/main"
-          SKIP_DIRS = {".git", ".github", "node_modules"}
+          CONTENT   = Path("content")
           SLUG_RE   = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]*$')
           FRONT_RE  = re.compile(r'^﻿?---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|$)(.*)$', re.S)
 
@@ -113,10 +108,9 @@ jobs:
 
           posts, errors, seen = [], [], {}
 
-          for mdx in sorted(Path(".").rglob("*.mdx")):
-            if any(part in SKIP_DIRS for part in mdx.parts): continue
-
-            slug = mdx.stem
+          for mdx in sorted(CONTENT.rglob("*.mdx")):
+            # the folder path under content/ plus the file name is the URL, e.g. content/16-10-2026/pre-launch.mdx -> 16-10-2026/pre-launch
+            slug = mdx.relative_to(CONTENT).with_suffix("").as_posix()
             m = FRONT_RE.match(mdx.read_text(encoding="utf-8"))
             try:    front = (yaml.safe_load(m.group(1)) or {}) if m else {}
             except: front = None
@@ -130,11 +124,11 @@ jobs:
               print(f"  skip {slug} — draft")
               continue
 
-            if not SLUG_RE.match(slug):
-              errors.append(f"{mdx}: file name '{slug}' is not a valid URL slug (letters, numbers, '-' and '_' only)")
+            if not all(SLUG_RE.match(part) for part in slug.split("/")):
+              errors.append(f"{mdx}: '{slug}' is not a valid URL path (every folder and file name may only use letters, numbers, '-' and '_')")
               continue
             if slug in seen:
-              errors.append(f"{mdx}: duplicate slug '{slug}', also used by {seen[slug]} (the file name is the URL)")
+              errors.append(f"{mdx}: duplicate slug '{slug}', also used by {seen[slug]}")
               continue
             seen[slug] = str(mdx)
 
