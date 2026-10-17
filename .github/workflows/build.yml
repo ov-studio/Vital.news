@@ -26,24 +26,30 @@ jobs:
         with:
           fetch-depth: 0
 
-      # ── 2. Build news.json ─────────────────────────────────────────────────
+      # ── 2. Python + dependencies ───────────────────────────────────────────
+      # Installed in their own step (before the script starts) so the imports
+      # below always see them. Installing from inside the running script put
+      # packages in a user-site dir that the live interpreter never picked up.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: python -m pip install --quiet pyyaml markdown-it-py mdit-py-plugins nh3
+
+      # ── 3. Build news.json ─────────────────────────────────────────────────
       - name: Build news.json
         run: |
           python3 - << 'PYEOF'
-          import json, posixpath, re, subprocess, sys
+          import json, posixpath, re, sys
           from datetime import date, datetime, timezone
           from pathlib import Path
           from urllib.parse import quote
 
-          try:
-            import yaml, nh3
-            from markdown_it import MarkdownIt
-            from mdit_py_plugins.anchors import anchors_plugin
-          except ImportError:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "pyyaml", "markdown-it-py", "mdit-py-plugins", "nh3", "-q"])
-            import yaml, nh3
-            from markdown_it import MarkdownIt
-            from mdit_py_plugins.anchors import anchors_plugin
+          import yaml, nh3
+          from markdown_it import MarkdownIt
+          from mdit_py_plugins.anchors import anchors_plugin
 
           RAW_BASE  = "https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/main"
           SKIP_DIRS = {".git", ".github", "node_modules"}
@@ -181,11 +187,11 @@ jobs:
           print(f"\nBuilt news.json — {len(posts)} post(s)")
           PYEOF
 
-      # ── 3. Show what was built ─────────────────────────────────────────────
+      # ── 4. Show what was built ─────────────────────────────────────────────
       - name: Show news.json
         run: cat news.json
 
-      # ── 4. Commit news.json to main ────────────────────────────────────────
+      # ── 5. Commit news.json to main ────────────────────────────────────────
       # This is what the Next.js site actually fetches from at runtime.
       - name: Commit news.json to main
         run: |
@@ -201,7 +207,7 @@ jobs:
             echo "NEW_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
           fi
 
-      # ── 5. Purge jsDelivr cache ──────────────────────────────────────────
+      # ── 6. Purge jsDelivr cache ──────────────────────────────────────────
       # Strategy: purge @main and the exact commit SHA three times each,
       # spaced 15 s apart, to beat both edge-propagation lag (GitHub's own
       # CDN takes a few seconds to expose a new commit to jsDelivr's origin
