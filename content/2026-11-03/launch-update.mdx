@@ -1,0 +1,46 @@
+---
+title: "Almost There: Vital.sandbox Pre-Release"
+description: "The stable launch is almost here, and this pre-release build already has the latest features for you to start building with"
+date: 2026-11-03
+author: ov-studio
+tags: [announcement, update, prerelease]
+cover: "./cover.png"
+publish: true
+---
+
+This is a **pre-release (release candidate) build**, not the stable launch build. The stable launch is coming soon, but this one is already packed with all the latest features, so you can start building today. Expect rough edges, and tell us what you find.
+
+It brings the last big visual systems, a much sturdier network layer, and a result we're proud of: **our Lua implementation is now faster than GDScript in all aspects.** See it live on the [benchmarks](/benchmarks) page, and run it yourself.
+
+## Thank you
+> - **@Rohatcengizhanbucak** — Big shout out for bringing security issues to our attention, which helped us get them all resolved!
+> - **@ov-kivi** — For actively contributing towards Vital.kit and Vital.sandbox.
+> - **@Ianec21** — For contributing and getting Vehicle Wheel functioning normally.
+
+## Updates
+> ## # Security & Stability
+> - Resources now run in isolated Lua environments.
+> - Join rate limiting, and a version check when connecting.
+> - Server event handlers are now local-only unless marked `remote = true`.
+> - Safer asset downloads, stored per server.
+> - Fixes for several crashes.
+
+> ## # Gameplay
+> - **Virtual dimensions** — Up to 65,535 isolated worlds, each with its own rendering, physics, and audio.
+> - **Vehicle wheels** — Fixed, with a debug overlay for tuning.
+> - **Model sync** — Component transforms and blendshapes now replicate to every player.
+> - **Audio signals** — `audio:start` and `audio:finish`.
+> - **Mesh collision** — Bodies no longer fall through single-sided floors and walls.
+> - **FPS limit** — Servers can cap client FPS.
+
+> ## # Players
+> - **Server logos** — The window and taskbar icon switches to the server you join.
+> - **Nicknames** — Set yours in the main menu.
+> - **Kick reasons** — Shown in the main menu when a server kicks you.
+> - **Updates** — Type `update` in the console to update to the latest version.
+
+> ## # Visuals
+> - **GPU particles** — Emitters with shapes, materials, mesh particles, and trails.
+> - **Trails** — Ribbons that follow any node, such as a hand bone or a projectile.
+> - **Supersampled antialiasing** — Render the 3D scene at up to 2x scale for smoother edges.
+> - **Shader priority** — Control which shader wins when several cover the same surface.
