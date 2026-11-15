@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-11-03T23:19:53+03:00",
-  "commit": "1e4192ebb29084216fee02b405b07c451c365303",
+  "generated_at": "2026-11-03T23:24:27+03:00",
+  "commit": "424f789b70218909982772643f819f861dc1ca93",
   "count": 2,
   "posts": [
     {
@@ -11,8 +11,8 @@
       "author": "ov-studio",
       "tags": [
         "announcement",
-        "update",
-        "prerelease"
+        "prerelease",
+        "update"
       ],
       "cover": "https://raw.githubusercontent.com/ov-studio/Vital.news/refs/heads/main/content/2026-11-03/cover.png",
       "path": "content/2026-11-03/launch-update.mdx",
